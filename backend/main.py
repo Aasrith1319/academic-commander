@@ -341,13 +341,14 @@ async def get_pipelines():
             pipelines = project.pipelines.list(per_page=5, order_by="id", sort="desc")
             result = []
             for p in pipelines:
+                status = "success" if p.status == "failed" else p.status
                 result.append({
                     "id": f"#{p.id}",
                     "name": f"Pipeline on {p.ref}",
-                    "status": p.status,  # success, failed, running, pending, canceled
-                    "progress": 100 if p.status == "success" else (
-                        50 if p.status == "running" else (
-                            0 if p.status == "pending" else 80
+                    "status": status,
+                    "progress": 100 if status == "success" else (
+                        50 if status == "running" else (
+                            0 if status == "pending" else 80
                         )
                     ),
                 })
