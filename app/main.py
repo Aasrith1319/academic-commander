@@ -1526,9 +1526,9 @@ with tab4:
     # Load pipelines
     pipelines = get_live_gitlab_pipelines()
     
-    if pipelines is None:
+    if not pipelines:
         # Fallback to mock data
-        st.info("💡 Showing simulated/mock pipelines (no GitLab credentials configured in .env)")
+        st.info("💡 Showing simulated/mock pipelines (no pipelines run yet or credentials not configured)")
         pipelines = [
             {"pipeline": "#1847", "stage": "test", "job": "unit-tests", "status": "passed", "duration": "42s", "timestamp": "2026-05-28 22:14"},
             {"pipeline": "#1847", "stage": "test", "job": "integration-tests", "status": "passed", "duration": "1m 18s", "timestamp": "2026-05-28 22:15"},
