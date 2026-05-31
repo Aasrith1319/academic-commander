@@ -41,9 +41,7 @@ unit-tests:
     paths:
       - reports/
     expire_in: 30 days
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push"
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
 
 integration-tests:
   stage: test
@@ -63,9 +61,7 @@ integration-tests:
       - reports/
     expire_in: 30 days
   allow_failure: true
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push"
-    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # STAGE: grade
@@ -124,5 +120,4 @@ auto-grade:
     paths:
       - reports/grade-report.json
     expire_in: 90 days
-  rules:
-    - if: $CI_PIPELINE_SOURCE == "push"
+
