@@ -5,7 +5,8 @@
 **AI-Powered Autonomous Study Agent — Built on Google Cloud Agent Builder × Gemini 3**
 
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.40+-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io)
+[![React](https://img.shields.io/badge/React-19+-61DAFB?style=for-the-badge&logo=react&logoColor=white)](https://react.dev)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Google Cloud](https://img.shields.io/badge/Google_Cloud-Agent_Builder-4285F4?style=for-the-badge&logo=google-cloud&logoColor=white)](https://cloud.google.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge)](LICENSE)
 [![Hackathon](https://img.shields.io/badge/Rapid_Agent-Hackathon_2026-a855f7?style=for-the-badge)](https://googlecloudagentbuilder.devpost.com)
@@ -103,7 +104,8 @@ flowchart TB
 | 🔍 Search Engine | Elasticsearch | Full-text and semantic search over study materials |
 | 🦊 CI/CD | GitLab CI/CD | Automated testing and grading of code assignments |
 | 📡 Observability | Arize AI | LLM tracing, hallucination detection, quality metrics |
-| 📊 Dashboard | Streamlit | Real-time premium web dashboard |
+| 📊 Frontend | React + Vite | Premium glassmorphism dark-mode dashboard |
+| 🌐 Backend API | FastAPI | REST API bridging the agent to the frontend |
 | 📄 PDF Processing | PyPDF2 | Lecture note and textbook ingestion |
 | 🐍 Language | Python 3.11+ | Primary development language |
 
@@ -157,47 +159,54 @@ cp .env.example .env
 # Edit .env with your actual API keys and connection strings
 ```
 
-### 5. Launch the Dashboard
+### 5. Seed the Database
 
 ```bash
-streamlit run app/main.py
+python seed_db.py
 ```
 
-The dashboard will open at [http://localhost:8501](http://localhost:8501).
+### 6. Launch the Backend (FastAPI + ADK Agent)
 
-> **💡 Tip:** The dashboard works in **demo mode** even without live database connections — perfect for hackathon demos!
+```bash
+uvicorn backend.main:app --reload --port 8000
+```
+
+### 7. Launch the Frontend (React + Vite)
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The dashboard will open at [http://localhost:5173](http://localhost:5173).
+
+> **💡 Tip:** The agent auto-triggers the full 9-step analysis cycle when you upload a PDF through the Knowledge Base tab!
 
 ---
 
-## 🔧 Running MCP Servers
+## 🔧 MCP Servers
 
-Each MCP server runs independently and can be started individually:
+The MCP servers are **launched automatically** by the ADK Runner when the backend starts. Each server runs as a subprocess managed by `google-adk`'s `McpToolset`:
 
-```bash
-# Start all MCP servers (each in a separate terminal)
-python mcp_servers/ingestion_server.py      # Port 5001
-python mcp_servers/mongodb_server.py        # Port 5002
-python mcp_servers/elasticsearch_server.py  # Port 5003
-python mcp_servers/gitlab_server.py         # Port 5004
-python mcp_servers/arize_server.py          # Port 5005
-```
-
-Or use the orchestrator:
-
-```bash
-python run_all_servers.py
-```
+| Server | File | Purpose |
+|--------|------|---------|
+| Fivetran MCP | `mcp_servers/fivetran_mcp.py` | PDF ingestion & pipeline sync |
+| Elastic MCP | `mcp_servers/elastic_mcp.py` | Semantic search & indexing |
+| MongoDB MCP | `mcp_servers/mongodb_mcp.py` | Mastery scores & schedule CRUD |
+| GitLab MCP | `mcp_servers/gitlab_mcp.py` | Branch provisioning & CI/CD |
+| Arize MCP | `mcp_servers/arize_mcp.py` | Observability & hallucination detection |
 
 ---
 
 ## 📊 Running the Dashboard
 
 ```bash
-# Standard launch
-streamlit run app/main.py
+# Backend (from project root)
+uvicorn backend.main:app --reload --port 8000
 
-# With custom port
-streamlit run app/main.py --server.port 8080
+# Frontend (from frontend/ directory)
+cd frontend && npm run dev
 
 # With auto-reload on file changes
 streamlit run app/main.py --server.runOnSave true

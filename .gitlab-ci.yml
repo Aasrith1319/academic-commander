@@ -30,7 +30,7 @@ unit-tests:
     - python -m venv venv
     - source venv/bin/activate
     - pip install --upgrade pip
-    - pip install -r requirements.txt
+    - pip install -r requirements-test.txt
   script:
     - echo "🧪 Running unit tests..."
     - python -m pytest tests/ -v --tb=short --junitxml=reports/unit-tests.xml
@@ -51,7 +51,7 @@ integration-tests:
     - python -m venv venv
     - source venv/bin/activate
     - pip install --upgrade pip
-    - pip install -r requirements.txt
+    - pip install -r requirements-test.txt
   script:
     - echo "🔗 Running integration tests..."
     - python -m pytest tests/integration/ -v --tb=short --junitxml=reports/integration-tests.xml
@@ -79,7 +79,7 @@ auto-grade:
     - python -m venv venv
     - source venv/bin/activate
     - pip install --upgrade pip
-    - pip install -r requirements.txt
+    - pip install -r requirements-test.txt
   script:
     - echo "📝 Parsing test results and computing grade..."
     - |

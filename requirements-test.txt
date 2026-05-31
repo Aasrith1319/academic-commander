@@ -1,0 +1,2 @@
+# Test-only dependencies (used by GitLab CI/CD runner)
+pytest>=8.0.0
