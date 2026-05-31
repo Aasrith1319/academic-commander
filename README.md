@@ -1,93 +1,396 @@
-# academic-assignment-sandbox
+<div align="center">
 
+# ⚡ Academic Commander
 
+**AI-Powered Autonomous Study Agent — Built on Google Cloud Agent Builder × Gemini 3**
 
-## Getting started
+[![Python 3.11+](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.40+-FF4B4B?style=for-the-badge&logo=streamlit&logoColor=white)](https://streamlit.io)
+[![Google Cloud](https://img.shields.io/badge/Google_Cloud-Agent_Builder-4285F4?style=for-the-badge&logo=google-cloud&logoColor=white)](https://cloud.google.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-22c55e?style=for-the-badge)](LICENSE)
+[![Hackathon](https://img.shields.io/badge/Rapid_Agent-Hackathon_2026-a855f7?style=for-the-badge)](https://googlecloudagentbuilder.devpost.com)
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+---
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+**Academic Commander** is an autonomous AI study agent that ingests lecture materials, tracks topic mastery, auto-generates optimized study schedules, grades code assignments via CI/CD pipelines, and monitors its own quality through real-time observability — all orchestrated through five specialized MCP servers powered by Google Gemini 3.
 
-## Add your files
+[🚀 Quick Start](#-quick-start) · [📖 Documentation](#-how-it-works) · [🎥 Demo](#-demo) · [🤝 Contributing](#-contributing)
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+</div>
+
+---
+
+## 📐 Architecture
+
+The system follows a **Model Context Protocol (MCP)** architecture where the central Gemini-powered agent communicates with five specialized tool servers, each wrapping a partner-track technology:
+
+```mermaid
+flowchart TB
+    subgraph USER["👤 Student Interface"]
+        PDF["📄 PDF Upload"]
+        DASH["📊 Streamlit Dashboard"]
+    end
+
+    subgraph AGENT["🧠 Google Cloud Agent Builder"]
+        direction TB
+        ADK["google.adk.Agent\n+ Gemini 3 Model"]
+        TAO["Thought → Action → Observation\n(ADK Runner Loop)"]
+        TOOLSET["McpToolset\n(Auto Tool Discovery)"]
+    end
+
+    subgraph MCP["⚙️ Partner MCP Servers (FastMCP)"]
+        direction TB
+        MCP1["📥 Fivetran MCP\nPDF Ingestion + Sync"]
+        MCP2["🗄️ MongoDB MCP\nMastery & Schedule CRUD"]
+        MCP3["🔍 Elastic MCP\nSemantic Search & Index"]
+        MCP4["🦊 GitLab MCP\nCI/CD & Auto-Grading"]
+        MCP5["📡 Arize MCP\nTracing & Hallucination Detection"]
+    end
+
+    subgraph DATA["💾 Data Stores"]
+        MONGO[("MongoDB Atlas\n(Mastery + Schedule)")]
+        ELASTIC[("Elasticsearch\n(Study Materials)")]
+    end
+
+    subgraph PARTNER["🤝 Partner Integrations"]
+        GL["GitLab\nCI/CD Pipelines"]
+        AR["Arize AI\nObservability"]
+    end
+
+    PDF -->|upload| MCP1
+    MCP1 -->|extracted text| MCP3
+    MCP3 -->|indexed| ELASTIC
+    ADK -->|reasoning| TAO
+    TAO -->|tool selection| TOOLSET
+    TOOLSET -->|stdio MCP calls| MCP1 & MCP2 & MCP3 & MCP4 & MCP5
+    MCP2 <-->|read/write| MONGO
+    MCP4 <-->|API| GL
+    MCP5 <-->|traces| AR
+    DASH -->|displays| MONGO & ELASTIC & GL & AR
+    AGENT -->|responses| DASH
+
+    style AGENT fill:#1a1a2e,stroke:#00d4ff,stroke-width:2px,color:#e8eaed
+    style MCP fill:#0f0f23,stroke:#a855f7,stroke-width:2px,color:#e8eaed
+    style DATA fill:#0f0f23,stroke:#22c55e,stroke-width:2px,color:#e8eaed
+    style PARTNER fill:#0f0f23,stroke:#f97316,stroke-width:2px,color:#e8eaed
+    style USER fill:#0f0f23,stroke:#4f8cff,stroke-width:2px,color:#e8eaed
+```
+
+---
+
+## ✨ Features
+
+| Feature | Description |
+|---------|-------------|
+| 📥 **PDF Ingestion** | Upload lecture notes and textbooks — the agent extracts text, chunks it, and indexes it for semantic search |
+| 🎯 **Mastery Tracking** | Per-topic mastery scores stored in MongoDB, color-coded progress bars (red → yellow → green) |
+| 📅 **Smart Scheduling** | AI-optimized daily study plans that adapt based on upcoming exams and weak topics |
+| 🧠 **Agentic Reasoning** | Full Thought → Action → Observation trace log showing the agent's autonomous decision-making |
+| 🚀 **CI/CD Auto-Grading** | GitLab pipelines automatically test and grade code assignments with detailed reports |
+| 🛡️ **Quality Observability** | Arize AI integration tracks hallucination rates, latency, token usage, and response accuracy |
+| 🔍 **Semantic Search** | Elasticsearch-powered search across all ingested study materials |
+| 🌙 **Premium Dashboard** | Glassmorphism dark-mode UI with animations, gradients, and professional layout |
+
+---
+
+## 🛠️ Tech Stack
+
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| 🤖 Agent Core | Google ADK + Gemini 3 | Autonomous reasoning and tool orchestration |
+| 🔧 Tool Protocol | FastMCP 2.0 | Model Context Protocol servers for tool integration |
+| 🗄️ Primary Database | MongoDB Atlas | Mastery scores, schedules, student profiles |
+| 🔍 Search Engine | Elasticsearch | Full-text and semantic search over study materials |
+| 🦊 CI/CD | GitLab CI/CD | Automated testing and grading of code assignments |
+| 📡 Observability | Arize AI | LLM tracing, hallucination detection, quality metrics |
+| 📊 Dashboard | Streamlit | Real-time premium web dashboard |
+| 📄 PDF Processing | PyPDF2 | Lecture note and textbook ingestion |
+| 🐍 Language | Python 3.11+ | Primary development language |
+
+---
+
+## 📋 Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+- **Python 3.11+** — [Download](https://www.python.org/downloads/)
+- **Git** — [Download](https://git-scm.com/downloads)
+- **MongoDB** — [Atlas (cloud)](https://www.mongodb.com/atlas) or [local](https://www.mongodb.com/try/download/community)
+- **Elasticsearch** — [Elastic Cloud](https://www.elastic.co/cloud/) or [local](https://www.elastic.co/downloads/elasticsearch)
+- **Google Cloud Account** — [Sign up](https://cloud.google.com/) with Agent Builder & Gemini API access
+- **GitLab Account** — [Sign up](https://gitlab.com/) for CI/CD integration
+- **Arize AI Account** — [Sign up](https://arize.com/) for observability
+
+---
+
+## 🚀 Quick Start
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/your-username/academic-commander.git
+cd academic-commander
+```
+
+### 2. Create a Virtual Environment
+
+```bash
+python -m venv venv
+
+# Windows
+venv\Scripts\activate
+
+# macOS / Linux
+source venv/bin/activate
+```
+
+### 3. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Configure Environment Variables
+
+```bash
+cp .env.example .env
+# Edit .env with your actual API keys and connection strings
+```
+
+### 5. Launch the Dashboard
+
+```bash
+streamlit run app/main.py
+```
+
+The dashboard will open at [http://localhost:8501](http://localhost:8501).
+
+> **💡 Tip:** The dashboard works in **demo mode** even without live database connections — perfect for hackathon demos!
+
+---
+
+## 🔧 Running MCP Servers
+
+Each MCP server runs independently and can be started individually:
+
+```bash
+# Start all MCP servers (each in a separate terminal)
+python mcp_servers/ingestion_server.py      # Port 5001
+python mcp_servers/mongodb_server.py        # Port 5002
+python mcp_servers/elasticsearch_server.py  # Port 5003
+python mcp_servers/gitlab_server.py         # Port 5004
+python mcp_servers/arize_server.py          # Port 5005
+```
+
+Or use the orchestrator:
+
+```bash
+python run_all_servers.py
+```
+
+---
+
+## 📊 Running the Dashboard
+
+```bash
+# Standard launch
+streamlit run app/main.py
+
+# With custom port
+streamlit run app/main.py --server.port 8080
+
+# With auto-reload on file changes
+streamlit run app/main.py --server.runOnSave true
+```
+
+---
+
+## 🤖 Running the Agent
+
+The agent is built with **Google Cloud Agent Builder (ADK)** using the `Agent` class
+and `McpToolset` for native MCP server integration. Gemini 3 handles all reasoning
+and automatically discovers + invokes tools from each MCP server.
+
+```bash
+# Run the agent with a syllabus PDF (triggers full 9-step cycle)
+python -m agent.orchestration --file ingestion/syllabus.pdf
+
+# Send a free-form message to the agent
+python -m agent.orchestration --message "Show my mastery scores and schedule"
+
+# Run with verbose logging
+python -m agent.orchestration --log-level DEBUG
+```
+
+---
+
+## 📁 Project Structure
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.com/gaasrithtanvik.1319-group/academic-assignment-sandbox.git
-git branch -M main
-git push -uf origin main
+academic-commander/
+├── 📂 agent/                    # Google ADK Agent (Agent Builder)
+│   ├── __init__.py              # Package exports
+│   ├── config.py                # Config + MCP server descriptors
+│   ├── orchestration.py         # ADK Agent + McpToolset + Runner
+│   └── prompts.py               # Gemini 3 prompt templates
+├── 📂 app/                      # Streamlit dashboard
+│   └── main.py                  # Premium dark-mode dashboard
+├── 📂 ingestion/                # PDF upload staging directory
+│   └── .gitkeep
+├── 📂 mcp_servers/              # FastMCP partner tool servers
+│   ├── fivetran_mcp.py          # Fivetran: PDF ingestion + sync
+│   ├── elastic_mcp.py           # Elastic: Semantic search + indexing
+│   ├── mongodb_mcp.py           # MongoDB: Mastery & schedule CRUD
+│   ├── gitlab_mcp.py            # GitLab: CI/CD + code sandboxes
+│   └── arize_mcp.py             # Arize AI: Observability + tracing
+├── 📂 tests/                    # Test suite
+│   └── test_homework.py         # Automated grading tests (pytest)
+├── .env.example                 # Environment variable template
+├── .gitignore                   # Git ignore rules
+├── .gitlab-ci.yml               # CI/CD pipeline config
+├── LICENSE                      # MIT License
+├── README.md                    # This file
+└── requirements.txt             # Python dependencies
 ```
 
-## Integrate with your tools
+---
 
-* [Set up project integrations](https://gitlab.com/gaasrithtanvik.1319-group/academic-assignment-sandbox/-/settings/integrations)
+## 🤝 Partner Track Integrations
 
-## Collaborate with your team
+Academic Commander integrates five hackathon partner technologies:
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+### 1. 🗄️ MongoDB Atlas — Knowledge Persistence
 
-## Test and Deploy
+Stores mastery scores, study schedules, and student profiles as flexible JSON documents. The MCP server provides CRUD tools for the agent to read and update learning progress in real time.
 
-Use the built-in continuous integration in GitLab.
+### 2. 🔍 Elasticsearch — Semantic Study Search
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+All ingested study materials are indexed in Elasticsearch with chunked embeddings. The agent performs semantic search to find relevant content when answering questions or generating practice sets.
 
-***
+### 3. 🦊 GitLab CI/CD — Automated Code Grading
 
-# Editing this README
+Student code assignments are automatically tested and graded through GitLab CI/CD pipelines. The agent monitors pipeline status and integrates test results into the mastery matrix.
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+### 4. 📡 Arize AI — Agent Observability
 
-## Suggestions for a good README
+Every agent trace (Thought → Action → Observation) is logged to Arize AI. The dashboard displays real-time hallucination scores, response accuracy, token usage, and latency metrics.
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+### 5. 📥 PyPDF2 — Document Ingestion
 
-## Name
-Choose a self-explaining name for your project.
+Lecture PDFs are parsed, chunked, and converted to searchable text. The ingestion MCP server handles document processing and feeds content into Elasticsearch.
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+---
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+## ⚙️ How It Works
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+The agent follows a **9-step autonomous workflow**:
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+```mermaid
+sequenceDiagram
+    participant S as 👤 Student
+    participant D as 📊 Dashboard
+    participant A as 🤖 Agent (Gemini 3)
+    participant I as 📥 Ingestion MCP
+    participant E as 🔍 Elasticsearch MCP
+    participant M as 🗄️ MongoDB MCP
+    participant G as 🦊 GitLab MCP
+    participant R as 📡 Arize MCP
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+    S->>D: 1. Upload lecture PDF
+    D->>I: 2. Send PDF for processing
+    I->>E: 3. Index extracted text chunks
+    A->>M: 4. Query current mastery scores
+    A->>A: 5. THINK: Identify weak topics & gaps
+    A->>M: 6. Generate optimized study schedule
+    A->>G: 7. Check CI/CD pipeline results
+    A->>M: 8. Update mastery with grade results
+    A->>R: 9. Log trace + quality metrics
+    D->>S: Display real-time updates
+```
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+| Step | Action | MCP Server |
+|------|--------|------------|
+| 1 | Student uploads a lecture PDF via the dashboard | — |
+| 2 | PDF sent to the Ingestion MCP server for text extraction | `ingestion_server` |
+| 3 | Extracted text chunks indexed in Elasticsearch | `elasticsearch_server` |
+| 4 | Agent queries MongoDB for current mastery scores | `mongodb_server` |
+| 5 | Agent **thinks**: identifies weak topics, prerequisite gaps | Gemini 3 (internal) |
+| 6 | Agent generates an optimized daily study schedule | `mongodb_server` |
+| 7 | Agent checks GitLab CI/CD for assignment test results | `gitlab_server` |
+| 8 | Agent updates mastery scores based on grades | `mongodb_server` |
+| 9 | Full trace logged to Arize AI for quality monitoring | `arize_server` |
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+---
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+## 🎥 Demo
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+> 🎬 **Demo video coming soon!**
+>
+> A walkthrough video showcasing the full Academic Commander workflow — from PDF upload to autonomous study scheduling — will be available here.
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+<!-- Replace with actual demo video link -->
+<!-- [![Academic Commander Demo](https://img.youtube.com/vi/VIDEO_ID/maxresdefault.jpg)](https://youtu.be/VIDEO_ID) -->
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+**Screenshots:**
 
-## License
-For open source projects, say how it is licensed.
+| Dashboard Overview | Mastery Matrix | Agent Trace Log |
+|:-:|:-:|:-:|
+| *Coming soon* | *Coming soon* | *Coming soon* |
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+---
+
+## 🧪 Testing
+
+```bash
+# Run all tests
+python -m pytest tests/ -v
+
+# Run with coverage
+python -m pytest tests/ --cov=. --cov-report=html
+
+# Run only unit tests
+python -m pytest tests/ -v -k "not integration"
+```
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions! Here's how to get started:
+
+1. **Fork** the repository
+2. **Create** a feature branch (`git checkout -b feature/amazing-feature`)
+3. **Commit** your changes (`git commit -m 'Add amazing feature'`)
+4. **Push** to the branch (`git push origin feature/amazing-feature`)
+5. **Open** a Pull Request
+
+Please read our code of conduct and ensure your contributions align with the project's architecture.
+
+---
+
+## 📜 License
+
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 🙏 Acknowledgments
+
+- **[Google Cloud](https://cloud.google.com/)** — Agent Builder platform and Gemini 3 API
+- **[Google ADK](https://google.github.io/adk-docs/)** — Agent Development Kit for autonomous agents
+- **[MongoDB](https://www.mongodb.com/)** — Flexible document database for knowledge persistence
+- **[Elasticsearch](https://www.elastic.co/)** — Powerful search and analytics engine
+- **[GitLab](https://gitlab.com/)** — CI/CD pipelines for automated grading
+- **[Arize AI](https://arize.com/)** — LLM observability and hallucination detection
+- **[Streamlit](https://streamlit.io/)** — Beautiful data app framework
+- **Rapid Agent Hackathon 2026** — For pushing the boundaries of AI agent development
+
+---
+
+<div align="center">
+
+**Built with ⚡ for the Google Cloud Rapid Agent Hackathon 2026**
+
+*Academic Commander — Because studying should be intelligent.*
+
+</div>
