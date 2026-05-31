@@ -20,6 +20,23 @@
   --transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+[data-theme='light'] {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #f1f5f9;
+  --bg-tertiary: #e2e8f0;
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(0, 0, 0, 0.05);
+  --glass-hover: rgba(255, 255, 255, 0.9);
+  --accent-cyan: #0284c7;
+  --accent-blue: #2563eb;
+  --accent-purple: #9333ea;
+  --accent-green: #059669;
+  --accent-yellow: #d97706;
+  --accent-red: #e11d48;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -66,7 +83,7 @@ h1, h2, h3, h4, h5, h6 {
   -webkit-backdrop-filter: blur(24px) saturate(120%);
   position: relative;
   overflow: hidden;
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.1);
 }
 
 .glass-panel::before {

@@ -138,6 +138,8 @@ def run_syllabus_cycle_background(file_path: str, topic: str):
 
 class ChatRequest(BaseModel):
     message: str
+    topic: str = None
+    file: str = None
 
 
 @app.get("/api/status")
@@ -157,15 +159,29 @@ async def chat(request: ChatRequest):
         )}
 
     try:
-        # Inject context about uploaded files so agent knows file paths
+        # Save user message to history
+        db["chat_history"].insert_one({
+            "role": "user",
+            "content": request.message,
+            "topic": request.topic,
+            "file": request.file,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+
+        # Inject context about uploaded files and requested topics
         ingestion_dir = os.path.join(root_dir, "ingestion")
         files = os.listdir(ingestion_dir) if os.path.exists(ingestion_dir) else []
         file_list = ", ".join(files) if files else "None"
-        context_msg = (
-            f"[SYSTEM CONTEXT: The user has uploaded the following files to the "
-            f"'ingestion/' directory: {file_list}. Use these exact filenames if "
-            f"you need to process files for a topic.]\n\n{request.message}"
-        )
+        
+        context_parts = [
+            f"[SYSTEM CONTEXT: The user has uploaded the following files to the 'ingestion/' directory: {file_list}.]"
+        ]
+        if request.topic:
+            context_parts.append(f"[USER CONTEXT: The user is asking about topic: '{request.topic}']")
+        if request.file:
+            context_parts.append(f"[USER CONTEXT: The user is asking about file: '{request.file}']")
+            
+        context_msg = "\n".join(context_parts) + f"\n\n{request.message}"
 
         log_agent_activity("[AGENT] Processing user chat request", request.message[:100])
         response = await runner.run(context_msg)
@@ -179,9 +195,71 @@ async def chat(request: ChatRequest):
 
         reply = response.get("response", str(response))
         log_agent_activity("[AGENT] Response generated", f"{len(reply)} chars")
+        
+        # Save agent response to history
+        db["chat_history"].insert_one({
+            "role": "agent",
+            "content": reply,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        })
+        
         return {"reply": reply}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/chat_history")
+async def get_chat_history():
+    history = list(db["chat_history"].find({}, {"_id": 0}).sort("timestamp", 1))
+    return history
+
+@app.get("/api/files")
+async def get_files():
+    ingestion_dir = os.path.join(root_dir, "ingestion")
+    if not os.path.exists(ingestion_dir):
+        return []
+    
+    files = []
+    for filename in os.listdir(ingestion_dir):
+        filepath = os.path.join(ingestion_dir, filename)
+        if os.path.isfile(filepath):
+            stat = os.stat(filepath)
+            files.append({
+                "name": filename,
+                "size": stat.st_size,
+                "uploaded_at": datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat()
+            })
+    return files
+
+@app.get("/api/analytics")
+async def get_analytics():
+    # Fetch real topics
+    topics_data = list(db["weak_topic_index"].find({}, {"_id": 0}))
+    
+    # Calculate synthetic "Mental Score" based on recent study streak and mastery progression
+    # In a real app this might come from a sentiment analysis or wearable integration
+    mental_score = 85  # Example base score
+    study_score = 78
+    
+    if topics_data:
+        avg_mastery = sum([t.get("mastery_score", 0) for t in topics_data]) / len(topics_data)
+        study_score = int(min(100, max(0, avg_mastery * 1.1)))
+        
+        # Adjust mental score based on mastery (if struggling, mental score drops slightly)
+        if avg_mastery < 50:
+            mental_score -= 10
+        elif avg_mastery > 80:
+            mental_score += 10
+            
+    return {
+        "mental_score": min(100, mental_score),
+        "study_score": study_score,
+        "burnout_risk": "Low" if mental_score > 70 else "High",
+        "focus_hours": 14.5,
+        "topics_distribution": [
+            {"name": t.get("topic_id", "Unknown"), "value": t.get("mastery_score", 0)}
+            for t in topics_data
+        ]
+    }
 
 
 @app.get("/api/metrics")

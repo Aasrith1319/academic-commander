@@ -1,4 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import os
+
+APP_JSX = """import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LayoutDashboard, MessageSquare, Calendar, Activity, Zap, CheckCircle, Clock, AlertCircle, UploadCloud, Plus, X, BookOpen, BarChart3, Sun, Moon, Trash2, Send, FileText } from 'lucide-react';
 import './index.css';
@@ -735,3 +737,9 @@ function AddTopicModal({ onClose, onAdd }) {
     </div>
   );
 }
+"""
+
+with open(r"c:\Users\AASRITH\Downloads\academic commander\frontend\src\App.jsx", "w", encoding="utf-8") as f:
+    f.write(APP_JSX)
+
+print("Overhauled App.jsx successfully.")
