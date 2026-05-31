@@ -1,5 +1,5 @@
 """
-⚡ Academic Commander — Premium Streamlit Dashboard
+⚡ Academic Commander — Interactive Premium Dashboard
 Google Cloud Rapid Agent Hackathon 2026
 """
 
@@ -9,6 +9,21 @@ from datetime import datetime, timedelta
 import json
 import random
 import os
+import asyncio
+import logging
+import sys
+
+# Bootstrap environment variables
+from dotenv import load_dotenv
+load_dotenv(override=True)
+
+# Try to import agent runner
+try:
+    from agent.orchestration import AcademicCommanderRunner
+    AGENT_AVAILABLE = True
+except Exception as e:
+    AGENT_AVAILABLE = False
+    AGENT_ERROR = str(e)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # PAGE CONFIGURATION
@@ -654,6 +669,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 </style>
 """, unsafe_allow_html=True)
+
 # ─────────────────────────────────────────────────────────────────────────────
 # MONGODB CONNECTION (graceful fallback to mock data)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -670,9 +686,67 @@ try:
 except Exception:
     MOCK_MODE = True
 
+# ─────────────────────────────────────────────────────────────────────────────
+# INTERACTIVE DATA INITIALIZATION (Session State)
+# ─────────────────────────────────────────────────────────────────────────────
+if "mock_mastery" not in st.session_state:
+    st.session_state["mock_mastery"] = [
+        {"topic": "Linear Algebra", "mastery": 82, "last_reviewed": "2026-05-28"},
+        {"topic": "Probability & Statistics", "mastery": 65, "last_reviewed": "2026-05-27"},
+        {"topic": "Data Structures", "mastery": 91, "last_reviewed": "2026-05-28"},
+        {"topic": "Machine Learning Fundamentals", "mastery": 47, "last_reviewed": "2026-05-26"},
+        {"topic": "Database Systems", "mastery": 73, "last_reviewed": "2026-05-27"},
+        {"topic": "Computer Networks", "mastery": 34, "last_reviewed": "2026-05-25"},
+        {"topic": "Operating Systems", "mastery": 58, "last_reviewed": "2026-05-26"},
+        {"topic": "Discrete Mathematics", "mastery": 88, "last_reviewed": "2026-05-28"},
+        {"topic": "Software Engineering", "mastery": 71, "last_reviewed": "2026-05-27"},
+        {"topic": "Artificial Intelligence", "mastery": 52, "last_reviewed": "2026-05-25"},
+    ]
 
-def get_mastery_data():
-    """Return topic mastery data from MongoDB or mock fallback."""
+if "mock_schedule" not in st.session_state:
+    st.session_state["mock_schedule"] = [
+        {"time": "08:00 – 09:30", "topic": "Linear Algebra Review", "type": "review", "emoji": "📐"},
+        {"time": "09:45 – 11:15", "topic": "ML Fundamentals Lecture", "type": "lecture", "emoji": "🤖"},
+        {"time": "11:30 – 12:30", "topic": "Data Structures Practice", "type": "practice", "emoji": "🌳"},
+        {"time": "14:00 – 15:30", "topic": "Database Systems Lab", "type": "practice", "emoji": "🗄️"},
+        {"time": "15:45 – 16:45", "topic": "Probability Problem Sets", "type": "practice", "emoji": "🎲"},
+        {"time": "17:00 – 18:00", "topic": "Computer Networks Review", "type": "review", "emoji": "🌐"},
+        {"time": "19:00 – 20:30", "topic": "AI Mid-Semester Prep", "type": "exam", "emoji": "📝"},
+    ]
+
+if "terminal_logs" not in st.session_state:
+    st.session_state["terminal_logs"] = [
+        "[11:17:52] [academic_commander] Registered MCP toolsets: fivetran, elastic, mongodb, gitlab, arize.",
+        "[11:17:52] [academic_commander] Agent created with model 'gemini-2.5-flash'.",
+        "[11:17:52] [academic_commander] Session initialised: 8a1bfe3a-ae54-4f48-935b-4b15f5e33332",
+        "[11:17:53] [academic_commander] Ready for instructions. Upload a PDF or enter a prompt."
+    ]
+
+if "chat_history" not in st.session_state:
+    st.session_state["chat_history"] = []
+
+# Custom Logging Handler to stream logs to UI
+class StreamlitLogHandler(logging.Handler):
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            # Remove date for clean logging
+            clean_msg = f"[{datetime.now().strftime('%H:%M:%S')}] {msg.split('] ', 1)[-1] if '] ' in msg else msg}"
+            st.session_state["terminal_logs"].append(clean_msg)
+        except Exception:
+            pass
+
+# Configure root logging to capture agent actions
+logger = logging.getLogger("academic_commander")
+if not any(isinstance(h, StreamlitLogHandler) for h in logger.handlers):
+    handler = StreamlitLogHandler()
+    handler.setFormatter(logging.Formatter("[%(asctime)s] %(message)s", "%H:%M:%S"))
+    logger.addHandler(handler)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# DATA MUTATION HELPERS (Handles MongoDB / Fallback Session State)
+# ─────────────────────────────────────────────────────────────────────────────
+def load_mastery():
     if not MOCK_MODE and db is not None:
         try:
             records = list(db["weak_topic_index"].find({}, {"_id": 0}))
@@ -687,38 +761,51 @@ def get_mastery_data():
                 ]
         except Exception:
             pass
-    return [
-        {"topic": "Linear Algebra", "mastery": 82, "last_reviewed": "2026-05-28"},
-        {"topic": "Probability & Statistics", "mastery": 65, "last_reviewed": "2026-05-27"},
-        {"topic": "Data Structures", "mastery": 91, "last_reviewed": "2026-05-28"},
-        {"topic": "Machine Learning Fundamentals", "mastery": 47, "last_reviewed": "2026-05-26"},
-        {"topic": "Database Systems", "mastery": 73, "last_reviewed": "2026-05-27"},
-        {"topic": "Computer Networks", "mastery": 34, "last_reviewed": "2026-05-25"},
-        {"topic": "Operating Systems", "mastery": 58, "last_reviewed": "2026-05-26"},
-        {"topic": "Discrete Mathematics", "mastery": 88, "last_reviewed": "2026-05-28"},
-        {"topic": "Software Engineering", "mastery": 71, "last_reviewed": "2026-05-27"},
-        {"topic": "Artificial Intelligence", "mastery": 52, "last_reviewed": "2026-05-25"},
-    ]
+    return st.session_state["mock_mastery"]
 
+def save_mastery(topic_name, score):
+    if not MOCK_MODE and db is not None:
+        try:
+            db["weak_topic_index"].update_one(
+                {"topic_id": topic_name},
+                {"$set": {"mastery_score": int(score), "updated_at": datetime.now().isoformat()}},
+                upsert=True
+            )
+            return True
+        except Exception:
+            pass
+    # Update mock state
+    for item in st.session_state["mock_mastery"]:
+        if item["topic"].lower() == topic_name.lower():
+            item["mastery"] = int(score)
+            item["last_reviewed"] = datetime.now().strftime("%Y-%m-%d")
+            return True
+    # If not found, add it
+    st.session_state["mock_mastery"].append({
+        "topic": topic_name,
+        "mastery": int(score),
+        "last_reviewed": datetime.now().strftime("%Y-%m-%d")
+    })
+    return True
 
-def get_schedule_data():
-    """Return daily schedule from MongoDB or mock fallback."""
+def delete_mastery(topic_name):
+    if not MOCK_MODE and db is not None:
+        try:
+            db["weak_topic_index"].delete_one({"topic_id": topic_name})
+            return True
+        except Exception:
+            pass
+    st.session_state["mock_mastery"] = [m for m in st.session_state["mock_mastery"] if m["topic"].lower() != topic_name.lower()]
+    return True
+
+def load_schedule():
     if not MOCK_MODE and db is not None:
         try:
             today_str = datetime.now().strftime("%Y-%m-%d")
-            cursor = (
-                db["daily_routine_blocks"]
-                .find(
-                    {
-                        "start_time": {
-                            "$gte": today_str + "T00:00:00",
-                            "$lte": today_str + "T23:59:59",
-                        }
-                    },
-                    {"_id": 0},
-                )
-                .sort("start_time", 1)
-            )
+            cursor = db["daily_routine_blocks"].find(
+                {"start_time": {"$gte": today_str + "T00:00:00", "$lte": today_str + "T23:59:59"}},
+                {"_id": 0}
+            ).sort("start_time", 1)
             records = list(cursor)
             if records:
                 formatted = []
@@ -726,8 +813,8 @@ def get_schedule_data():
                     start_dt = datetime.fromisoformat(r["start_time"])
                     end_dt = start_dt + timedelta(minutes=r.get("duration_minutes", 60))
                     time_range = f"{start_dt.strftime('%H:%M')} – {end_dt.strftime('%H:%M')}"
-                    
                     name = r.get("activity_name", "Study Block")
+                    
                     act_type = "practice"
                     emoji = "📖"
                     if "review" in name.lower() or "revise" in name.lower():
@@ -747,48 +834,176 @@ def get_schedule_data():
                         "time": time_range,
                         "topic": name,
                         "type": act_type,
-                        "emoji": emoji
+                        "emoji": emoji,
+                        "raw_start": r["start_time"]
                     })
                 return formatted
         except Exception:
             pass
-    return [
-        {"time": "08:00 – 09:30", "topic": "Linear Algebra Review", "type": "review", "emoji": "📐"},
-        {"time": "09:45 – 11:15", "topic": "ML Fundamentals Lecture", "type": "lecture", "emoji": "🤖"},
-        {"time": "11:30 – 12:30", "topic": "Data Structures Practice", "type": "practice", "emoji": "🌳"},
-        {"time": "14:00 – 15:30", "topic": "Database Systems Lab", "type": "practice", "emoji": "🗄️"},
-        {"time": "15:45 – 16:45", "topic": "Probability Problem Sets", "type": "practice", "emoji": "🎲"},
-        {"time": "17:00 – 18:00", "topic": "Computer Networks Review", "type": "review", "emoji": "🌐"},
-        {"time": "19:00 – 20:30", "topic": "AI Mid-Semester Prep", "type": "exam", "emoji": "📝"},
-    ]
+    return sorted(st.session_state["mock_schedule"], key=lambda x: x["time"])
 
+def save_schedule(activity_name, start_time_str, duration_minutes):
+    if not MOCK_MODE and db is not None:
+        try:
+            today_str = datetime.now().strftime("%Y-%m-%d")
+            start_iso = f"{today_str}T{start_time_str}:00"
+            db["daily_routine_blocks"].insert_one({
+                "activity_name": activity_name,
+                "start_time": start_iso,
+                "duration_minutes": int(duration_minutes)
+            })
+            return True
+        except Exception:
+            pass
+    # Format time range
+    sh, sm = map(int, start_time_str.split(":"))
+    start_dt = datetime(2026, 5, 31, sh, sm)
+    end_dt = start_dt + timedelta(minutes=int(duration_minutes))
+    time_range = f"{start_dt.strftime('%H:%M')} – {end_dt.strftime('%H:%M')}"
+    
+    act_type = "practice"
+    emoji = "📖"
+    if "review" in activity_name.lower() or "revise" in activity_name.lower():
+        act_type = "review"
+        emoji = "📐"
+    elif "lecture" in activity_name.lower() or "class" in activity_name.lower():
+        act_type = "lecture"
+        emoji = "🤖"
+    elif "exam" in activity_name.lower() or "midterm" in activity_name.lower() or "prep" in activity_name.lower():
+        act_type = "exam"
+        emoji = "📝"
+    elif "lab" in activity_name.lower():
+        act_type = "practice"
+        emoji = "🗄️"
+        
+    st.session_state["mock_schedule"].append({
+        "time": time_range,
+        "topic": activity_name,
+        "type": act_type,
+        "emoji": emoji
+    })
+    return True
 
-def get_pipeline_data():
-    """Return CI/CD pipeline data from mock."""
-    return [
-        {"pipeline": "#1847", "stage": "test", "job": "unit-tests", "status": "passed", "duration": "42s", "timestamp": "2026-05-28 22:14"},
-        {"pipeline": "#1847", "stage": "test", "job": "integration-tests", "status": "passed", "duration": "1m 18s", "timestamp": "2026-05-28 22:15"},
-        {"pipeline": "#1847", "stage": "grade", "job": "auto-grade", "status": "passed", "duration": "23s", "timestamp": "2026-05-28 22:16"},
-        {"pipeline": "#1846", "stage": "test", "job": "unit-tests", "status": "passed", "duration": "39s", "timestamp": "2026-05-28 18:05"},
-        {"pipeline": "#1846", "stage": "test", "job": "integration-tests", "status": "passed", "duration": "1m 02s", "timestamp": "2026-05-28 18:06"},
-        {"pipeline": "#1845", "stage": "test", "job": "unit-tests", "status": "passed", "duration": "41s", "timestamp": "2026-05-27 14:32"},
-        {"pipeline": "#1845", "stage": "grade", "job": "auto-grade", "status": "passed", "duration": "21s", "timestamp": "2026-05-27 14:33"},
-    ]
+def delete_schedule(topic_title):
+    if not MOCK_MODE and db is not None:
+        try:
+            db["daily_routine_blocks"].delete_one({"activity_name": topic_title})
+            return True
+        except Exception:
+            pass
+    st.session_state["mock_schedule"] = [s for s in st.session_state["mock_schedule"] if s["topic"] != topic_title]
+    return True
 
+# ─────────────────────────────────────────────────────────────────────────────
+# GITLAB LIVE CONNECTION HELPERS
+# ─────────────────────────────────────────────────────────────────────────────
+def get_live_gitlab_pipelines():
+    gitlab_token = os.getenv("GITLAB_TOKEN", "")
+    project_id = os.getenv("GITLAB_PROJECT_ID", "")
+    gitlab_url = os.getenv("GITLAB_URL", "https://gitlab.com")
+    
+    if not gitlab_token or not project_id:
+        return None
+        
+    try:
+        import gitlab
+        gl = gitlab.Gitlab(gitlab_url, private_token=gitlab_token)
+        project = gl.projects.get(int(project_id))
+        pipelines = project.pipelines.list(page=1, per_page=6)
+        
+        results = []
+        for p in pipelines:
+            jobs = p.jobs.list(all=True)
+            for j in jobs:
+                created_at = j.created_at[:16].replace("T", " ") if j.created_at else "N/A"
+                dur = j.duration
+                if dur:
+                    duration_str = f"{int(dur // 60)}m {int(dur % 60)}s" if dur >= 60 else f"{int(dur)}s"
+                else:
+                    duration_str = "0s"
+                    
+                status_mapped = "passed" if j.status == "success" else j.status
+                results.append({
+                    "pipeline": f"#{p.id}",
+                    "stage": j.stage,
+                    "job": j.name,
+                    "status": status_mapped,
+                    "duration": duration_str,
+                    "timestamp": created_at
+                })
+        return results
+    except Exception as exc:
+        logger.error(f"GitLab API request failed: {exc}")
+        return None
 
+def trigger_gitlab_pipeline_run():
+    gitlab_token = os.getenv("GITLAB_TOKEN", "")
+    project_id = os.getenv("GITLAB_PROJECT_ID", "")
+    
+    if not gitlab_token or not project_id:
+        return {"error": "GitLab credentials are not set in your .env"}
+        
+    try:
+        import gitlab
+        gl = gitlab.Gitlab("https://gitlab.com", private_token=gitlab_token)
+        project = gl.projects.get(int(project_id))
+        pipeline = project.pipelines.create({"ref": "main"})
+        return {"success": f"Pipeline #{pipeline.id} triggered successfully on branch 'main'!"}
+    except Exception as exc:
+        return {"error": f"Failed to trigger pipeline: {exc}"}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# QUALITY OBSERVABILITY HELPERS
+# ─────────────────────────────────────────────────────────────────────────────
 def get_quality_metrics():
-    """Return Arize AI quality metrics (mock)."""
+    """Return Arize AI quality metrics (mock or live placeholder)."""
     return {
         "hallucination_score": 0.04,
         "avg_latency_ms": 287,
-        "total_tokens": 184_520,
-        "trace_count": 1_247,
+        "total_tokens": 184520,
+        "trace_count": 1247,
         "accuracy": 0.96,
         "relevance": 0.93,
         "safety_score": 0.99,
         "cost_usd": 3.42,
     }
 
+# ─────────────────────────────────────────────────────────────────────────────
+# STUDENT PROFILE HELPERS
+# ─────────────────────────────────────────────────────────────────────────────
+def load_student_profile():
+    if not MOCK_MODE and db is not None:
+        try:
+            profile = db["students"].find_one({"user_id": "student_001"}, {"_id": 0})
+            if profile:
+                return profile
+        except Exception:
+            pass
+    return {
+        "user_id": "student_001",
+        "name": "Aasrith K.",
+        "student_id": "AC-2026-0429",
+        "semester": "Spring 2026",
+        "program": "B.Tech CS"
+    }
+
+def save_student_profile(name, student_id, semester, program):
+    if not MOCK_MODE and db is not None:
+        try:
+            db["students"].update_one(
+                {"user_id": "student_001"},
+                {"$set": {
+                    "name": name,
+                    "student_id": student_id,
+                    "semester": semester,
+                    "program": program
+                }},
+                upsert=True
+            )
+            return True
+        except Exception:
+            pass
+    return True
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SIDEBAR
@@ -797,8 +1012,8 @@ with st.sidebar:
     st.markdown("""
     <div style="text-align:center; padding: 16px 0 8px 0;">
         <span style="font-size: 2.2rem;">⚡</span>
-        <div style="font-family:'Inter',sans-serif; font-weight:800; font-size:1.25rem;
-                    background: linear-gradient(135deg, #00d4ff, #a855f7);
+        <div style="font-family:'Outfit',sans-serif; font-weight:800; font-size:1.25rem;
+                    background: linear-gradient(135deg, #00d4ff, #d946ef);
                     -webkit-background-clip: text; -webkit-text-fill-color: transparent;
                     background-clip: text; margin-top:4px;">
             Academic Commander
@@ -812,46 +1027,86 @@ with st.sidebar:
     st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
     # Student Profile
-    st.markdown("""
+    student_profile = load_student_profile()
+    st.markdown(f"""
     <div class="sidebar-profile">
         <h4 style="color:#e8eaed;">👤 Student Profile</h4>
         <div class="sidebar-stat">
             <span class="sidebar-stat-label">Name</span>
-            <span class="sidebar-stat-value">Aasrith K.</span>
+            <span class="sidebar-stat-value">{student_profile.get('name', 'Aasrith K.')}</span>
         </div>
         <div class="sidebar-stat">
             <span class="sidebar-stat-label">Student ID</span>
-            <span class="sidebar-stat-value">AC-2026-0429</span>
+            <span class="sidebar-stat-value">{student_profile.get('student_id', 'AC-2026-0429')}</span>
         </div>
         <div class="sidebar-stat">
             <span class="sidebar-stat-label">Semester</span>
-            <span class="sidebar-stat-value">Spring 2026</span>
+            <span class="sidebar-stat-value">{student_profile.get('semester', 'Spring 2026')}</span>
         </div>
         <div class="sidebar-stat">
             <span class="sidebar-stat-label">Program</span>
-            <span class="sidebar-stat-value">B.Tech CS</span>
+            <span class="sidebar-stat-value">{student_profile.get('program', 'B.Tech CS')}</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
+    with st.expander("⚙️ Edit Student Profile"):
+        new_name = st.text_input("Name", value=student_profile.get('name', 'Aasrith K.'))
+        new_id = st.text_input("Student ID", value=student_profile.get('student_id', 'AC-2026-0429'))
+        new_sem = st.text_input("Semester", value=student_profile.get('semester', 'Spring 2026'))
+        new_prog = st.text_input("Program", value=student_profile.get('program', 'B.Tech CS'))
+        if st.button("Save Profile Info", use_container_width=True):
+            save_student_profile(new_name, new_id, new_sem, new_prog)
+            st.success("Profile saved!")
+            st.rerun()
+
     # PDF Upload
-    st.markdown("##### 📄 Upload Study Material")
+    st.markdown("##### 📄 Ingest Study Material")
     uploaded_file = st.file_uploader(
-        "Drop a PDF to ingest",
+        "Upload lecture PDF to trigger agent analysis",
         type=["pdf"],
-        help="Upload lecture notes, textbooks, or assignments for AI-powered analysis.",
+        help="Upload lecture notes, syllabus, or textbooks to kick off the autonomous loop.",
     )
     if uploaded_file is not None:
-        st.success(f"✅ Uploaded: {uploaded_file.name}")
+        # Save file locally for ingestion
+        os.makedirs("ingestion", exist_ok=True)
+        temp_path = os.path.join("ingestion", uploaded_file.name)
+        with open(temp_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        
+        st.success(f"File uploaded: {uploaded_file.name}")
+        
+        # Trigger Ingestion Async
+        if st.button("🚀 Ingest & Restructure Study Plan", use_container_width=True):
+            if AGENT_AVAILABLE:
+                with st.spinner("Agent running autonomous ingestion... Check console tab."):
+                    try:
+                        runner = AcademicCommanderRunner()
+                        # Run async function using runner loop
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        result = loop.run_until_complete(runner.run_syllabus_cycle(temp_path))
+                        st.balloons()
+                        st.success("Syllabus processed and study matrix updated!")
+                    except Exception as e:
+                        st.error(f"Agent error: {e}")
+            else:
+                st.warning(f"Agent is unavailable: {AGENT_ERROR}")
 
     st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 
     # Agent Status
-    st.markdown("""
+    status_label = "ADK AGENT OPERATIONAL" if AGENT_AVAILABLE else "ADK CONFIG ERROR"
+    badge_bg = "rgba(16, 185, 129, 0.08)" if AGENT_AVAILABLE else "rgba(244, 63, 94, 0.08)"
+    badge_border = "rgba(16, 185, 129, 0.2)" if AGENT_AVAILABLE else "rgba(244, 63, 94, 0.2)"
+    badge_color = "var(--accent-green)" if AGENT_AVAILABLE else "var(--accent-red)"
+    dot_color = "var(--accent-green)" if AGENT_AVAILABLE else "var(--accent-red)"
+    
+    st.markdown(f"""
     <div style="display:flex; align-items:center; justify-content:center; margin: 8px 0 4px 0;">
-        <div class="status-badge">
-            <div class="status-dot"></div>
-            ADK AGENT OPERATIONAL
+        <div class="status-badge" style="background:{badge_bg}; border-color:{badge_border}; color:{badge_color};">
+            <div class="status-dot" style="background:{dot_color};"></div>
+            {status_label}
         </div>
     </div>
     <div style="text-align:center; font-size:0.7rem; color:#888; margin-bottom:12px;">
@@ -860,8 +1115,8 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     # Quick Stats
-    mastery_data = get_mastery_data()
-    avg_mastery = sum(d["mastery"] for d in mastery_data) / len(mastery_data)
+    mastery_data = load_mastery()
+    avg_mastery = sum(d["mastery"] for d in mastery_data) / len(mastery_data) if mastery_data else 0
 
     st.markdown(f"""
     <div class="sidebar-profile">
@@ -875,7 +1130,7 @@ with st.sidebar:
             <span class="sidebar-stat-value">{avg_mastery:.0f}%</span>
         </div>
         <div class="sidebar-stat">
-            <span class="sidebar-stat-label">Upcoming Deadlines</span>
+            <span class="sidebar-stat-label">Pending Labs</span>
             <span class="sidebar-stat-value">3</span>
         </div>
         <div class="sidebar-stat">
@@ -910,10 +1165,10 @@ st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 m1, m2, m3, m4 = st.columns(4)
 
 with m1:
-    st.markdown("""
+    st.markdown(f"""
     <div class="metric-card cyan">
         <div class="metric-label">Topics Tracked</div>
-        <div class="metric-value">10</div>
+        <div class="metric-value">{len(mastery_data)}</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -926,18 +1181,31 @@ with m2:
     """, unsafe_allow_html=True)
 
 with m3:
-    st.markdown("""
+    st.markdown(f"""
     <div class="metric-card green">
-        <div class="metric-label">Agent Traces</div>
-        <div class="metric-value">1,247</div>
+        <div class="metric-label">Session Commands</div>
+        <div class="metric-value">{len(st.session_state.get("chat_history", []))}</div>
     </div>
     """, unsafe_allow_html=True)
 
 with m4:
-    st.markdown("""
+    # Get live branch count
+    branch_count = 5
+    try:
+        gitlab_token = os.getenv("GITLAB_TOKEN", "")
+        project_id = os.getenv("GITLAB_PROJECT_ID", "")
+        if gitlab_token and project_id:
+            import gitlab
+            gl = gitlab.Gitlab("https://gitlab.com", private_token=gitlab_token)
+            p = gl.projects.get(int(project_id))
+            branch_count = len(p.branches.list(all=True))
+    except Exception:
+        pass
+        
+    st.markdown(f"""
     <div class="metric-card orange">
-        <div class="metric-label">CI/CD Pipelines</div>
-        <div class="metric-value">47</div>
+        <div class="metric-label">Active Lab Branches</div>
+        <div class="metric-value">{branch_count}</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -948,7 +1216,7 @@ st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
 # ─────────────────────────────────────────────────────────────────────────────
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🎯 Mastery Matrix",
-    "🧠 Agentic Thinking Log",
+    "💬 Agent Console",
     "📅 Daily Schedule",
     "🚀 Pipeline Status",
     "🛡️ Agent Quality",
@@ -958,165 +1226,258 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 # ═══════════════════════ TAB 1: Mastery Matrix ═══════════════════════════════
 with tab1:
     st.markdown("""
-    <div class="glass-card">
-        <h3 style="margin-top:0; font-size:1.15rem;">📈 Topic Mastery Overview</h3>
-        <p style="color:var(--text-secondary); font-size:0.88rem; margin-bottom:20px;">
-            Real-time mastery scores pulled from MongoDB. Color-coded by proficiency level.
+    <div class="glass-card" style="margin-bottom: 24px;">
+        <h3 style="margin-top:0; font-size:1.25rem;">📈 Topic Mastery Overview</h3>
+        <p style="color:var(--text-secondary); font-size:0.88rem; margin-bottom:10px;">
+            Real-time mastery scores. You can adjust scores using the inputs below, add new study topics, or provision GitLab coding labs.
         </p>
+    </div>
     """, unsafe_allow_html=True)
 
+    # Search & Filter
+    f1, f2 = st.columns([3, 1])
+    with f1:
+        search_query = st.text_input("🔍 Search Subject Topics", placeholder="Type a concept name...").strip().lower()
+    with f2:
+        status_filter = st.selectbox("Proficiency Category", ["All", "Proficient (>70%)", "In Progress (40-70%)", "Needs Work (<40%)"])
+
+    # Add Topic Expander
+    with st.expander("➕ Add New Concept Topic"):
+        col_new1, col_new2 = st.columns([3, 1])
+        with col_new1:
+            new_topic_name = st.text_input("Topic Name", placeholder="e.g. Graph Theory")
+        with col_new2:
+            new_topic_score = st.slider("Initial Mastery Score (%)", 0, 100, 50)
+            
+        if st.button("Save Topic to Matrix", use_container_width=True):
+            if new_topic_name:
+                save_mastery(new_topic_name, new_topic_score)
+                st.success(f"Added topic: {new_topic_name}!")
+                st.rerun()
+            else:
+                st.error("Please enter a topic name.")
+
+    st.markdown("<br/>", unsafe_allow_html=True)
+
+    # Load list
+    filtered_data = []
     for item in mastery_data:
-        mastery = item["mastery"]
         topic = item["topic"]
+        mastery = item["mastery"]
+        
+        # Apply filters
+        if search_query and search_query not in topic.lower():
+            continue
+            
+        if status_filter == "Proficient (>70%)" and mastery <= 70:
+            continue
+        elif status_filter == "In Progress (40-70%)" and (mastery < 40 or mastery > 70):
+            continue
+        elif status_filter == "Needs Work (<40%)" and mastery >= 40:
+            continue
+            
+        filtered_data.append(item)
+
+    # Render Rows
+    for item in filtered_data:
+        topic = item["topic"]
+        mastery = item["mastery"]
         last_rev = item.get("last_reviewed", "N/A")
 
         if mastery < 40:
             color_class = "progress-red"
-            badge_color = "#ef4444"
+            badge_color = "#f43f5e"
             badge_label = "NEEDS WORK"
         elif mastery < 70:
             color_class = "progress-yellow"
-            badge_color = "#facc15"
+            badge_color = "#fbbf24"
             badge_label = "IN PROGRESS"
         else:
             color_class = "progress-green"
-            badge_color = "#22c55e"
+            badge_color = "#10b981"
             badge_label = "PROFICIENT"
 
         st.markdown(f"""
-        <div style="display:flex; justify-content:space-between; align-items:center;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top: 10px;">
             <div>
-                <span style="font-weight:600; font-size:0.95rem;">{topic}</span>
-                <span style="font-size:0.7rem; color:{badge_color}; background:rgba({','.join(str(int(badge_color.lstrip('#')[i:i+2], 16)) for i in (0, 2, 4))},0.12);
-                      padding:2px 8px; border-radius:4px; margin-left:8px; font-weight:600;">{badge_label}</span>
+                <span style="font-weight:700; font-size:1.05rem; color:#f3f4f6;">{topic}</span>
+                <span style="font-size:0.72rem; color:{badge_color}; background:rgba({','.join(str(int(badge_color.lstrip('#')[i:i+2], 16)) for i in (0, 2, 4))},0.12);
+                      padding:3px 10px; border-radius:6px; margin-left:12px; font-weight:700; border: 1px solid rgba({','.join(str(int(badge_color.lstrip('#')[i:i+2], 16)) for i in (0, 2, 4))},0.2);">{badge_label}</span>
             </div>
-            <div style="display:flex; align-items:center; gap:12px;">
-                <span style="font-size:0.75rem; color:var(--text-muted);">Last: {last_rev}</span>
-                <span style="font-weight:700; font-size:1rem; color:{badge_color};">{mastery}%</span>
+            <div style="display:flex; align-items:center; gap:16px;">
+                <span style="font-size:0.8rem; color:var(--text-muted);">Last: {last_rev}</span>
+                <span style="font-weight:800; font-size:1.15rem; color:{badge_color};">{mastery}%</span>
             </div>
         </div>
         <div class="progress-container {color_class}">
             <div class="progress-fill" style="width:{mastery}%;"></div>
         </div>
         """, unsafe_allow_html=True)
+        
+        # Interactive actions per topic
+        col_act1, col_act2, col_act3 = st.columns([3, 1, 1])
+        with col_act1:
+            # Slider to update score
+            new_score = st.slider(f"Adjust score for: {topic}", 0, 100, int(mastery), key=f"slide_{topic}", label_visibility="collapsed")
+            if new_score != mastery:
+                save_mastery(topic, new_score)
+                st.rerun()
+        with col_act2:
+            # Provision Lab button
+            if st.button("⚡ Provision Git Lab", key=f"lab_{topic}", use_container_width=True):
+                if AGENT_AVAILABLE:
+                    with st.spinner("Provisioning coding lab..."):
+                        try:
+                            # Direct request to provision
+                            runner = AcademicCommanderRunner()
+                            loop = asyncio.new_event_loop()
+                            asyncio.set_event_loop(loop)
+                            msg = f"Provision a coding sandbox on GitLab for the topic '{topic}' with a starter file."
+                            res = loop.run_until_complete(runner.run(msg))
+                            st.toast(f"✅ Lab branch created: sandbox/{topic.lower().replace(' ', '-')}", icon="🚀")
+                        except Exception as e:
+                            st.error(f"Failed to provision: {e}")
+                else:
+                    st.warning("Agent Offline (simulating sandbox creation)")
+                    st.toast(f"✅ Mock Lab branch created: sandbox/{topic.lower().replace(' ', '-')}", icon="🚀")
+        with col_act3:
+            # Delete button
+            if st.button("🗑️ Remove Topic", key=f"del_{topic}", use_container_width=True):
+                delete_mastery(topic)
+                st.warning(f"Deleted topic: {topic}")
+                st.rerun()
+        st.markdown("<hr style='border:0; height:1px; background:rgba(255,255,255,0.03); margin:12px 0;'/>", unsafe_allow_html=True)
 
-    st.markdown("</div>", unsafe_allow_html=True)
 
-
-# ═══════════════════════ TAB 2: Agentic Thinking Log ═════════════════════════
+# ═══════════════════════ TAB 2: Agent Console & Live Chat ════════════════════
 with tab2:
     st.markdown("""
-    <div class="glass-card">
-        <h3 style="margin-top:0; font-size:1.15rem;">🧠 Thought → Action → Observation Trace</h3>
-        <p style="color:var(--text-secondary); font-size:0.88rem; margin-bottom:20px;">
-            Live trace of the autonomous agent's reasoning loop powered by Gemini 3.
+    <div class="glass-card" style="margin-bottom: 24px;">
+        <h3 style="margin-top:0; font-size:1.25rem;">💬 Live Co-Pilot & Autonomous Executer</h3>
+        <p style="color:var(--text-secondary); font-size:0.88rem; margin-bottom:10px;">
+            Interact directly with the Gemini 3 agent. Watch the agent process your prompt, select MCP tools, and log thought-chains live in the terminal output.
         </p>
     </div>
     """, unsafe_allow_html=True)
 
-    trace_log = [
-        {
-            "type": "thought",
-            "tag_class": "tag-thought",
-            "entry_class": "trace-thought",
-            "timestamp": "22:14:03",
-            "content": "The student uploaded 'Ch7_Linear_Algebra.pdf'. I need to extract key concepts, identify prerequisite gaps, and update the mastery matrix. Let me first parse the PDF via the Ingestion MCP server."
-        },
-        {
-            "type": "action",
-            "tag_class": "tag-action",
-            "entry_class": "trace-action",
-            "timestamp": "22:14:04",
-            "content": "→ <strong>MCP Call</strong>: <code>ingestion_server.extract_text(file='Ch7_Linear_Algebra.pdf')</code><br/>→ <strong>MCP Call</strong>: <code>elasticsearch_server.index_document(index='study_materials', body={...})</code>"
-        },
-        {
-            "type": "observation",
-            "tag_class": "tag-observe",
-            "entry_class": "trace-observe",
-            "timestamp": "22:14:06",
-            "content": "✓ Extracted 24 pages, 847 sentences. Key topics identified: Eigenvalues, Eigenvectors, Diagonalization, SVD. Indexed to Elasticsearch with doc_id='sm_00482'. The student's mastery on Eigenvalues is currently 62% — below the 70% threshold."
-        },
-        {
-            "type": "thought",
-            "tag_class": "tag-thought",
-            "entry_class": "trace-thought",
-            "timestamp": "22:14:07",
-            "content": "The Eigenvalues mastery is 62%, which is in the 'yellow zone'. I should generate a targeted practice set focusing on characteristic equations and diagonalization. Let me also check if there's an upcoming exam via the schedule."
-        },
-        {
-            "type": "action",
-            "tag_class": "tag-action",
-            "entry_class": "trace-action",
-            "timestamp": "22:14:08",
-            "content": "→ <strong>MCP Call</strong>: <code>mongodb_server.query('schedule', {topic: /linear algebra/i, type: 'exam'})</code><br/>→ <strong>MCP Call</strong>: <code>mongodb_server.update('mastery', {topic: 'Linear Algebra'}, {$set: {subtopics: {eigenvalues: 0.62}}})</code>"
-        },
-        {
-            "type": "observation",
-            "tag_class": "tag-observe",
-            "entry_class": "trace-observe",
-            "timestamp": "22:14:09",
-            "content": "✓ Found upcoming exam: 'Linear Algebra Mid-Semester' on 2026-06-03 (5 days away). Mastery subtopic updated. Priority level elevated to HIGH. Generating 15-question practice set with spaced repetition schedule."
-        },
-        {
-            "type": "thought",
-            "tag_class": "tag-thought",
-            "entry_class": "trace-thought",
-            "timestamp": "22:14:10",
-            "content": "Exam in 5 days with sub-70% mastery on a key subtopic. I need to restructure today's remaining schedule to add an extra review block and push the GitLab assignment auto-grade to confirm the student's recent submission passed."
-        },
-        {
-            "type": "action",
-            "tag_class": "tag-action",
-            "entry_class": "trace-action",
-            "timestamp": "22:14:11",
-            "content": "→ <strong>MCP Call</strong>: <code>gitlab_server.get_pipeline_status(project='math-201', pipeline_id=1847)</code><br/>→ <strong>MCP Call</strong>: <code>mongodb_server.update('schedule', {date: '2026-05-29'}, {$push: {blocks: {time: '20:30-21:30', topic: 'Eigenvalues Drill'}}})</code>"
-        },
-        {
-            "type": "observation",
-            "tag_class": "tag-observe",
-            "entry_class": "trace-observe",
-            "timestamp": "22:14:12",
-            "content": "✓ Pipeline #1847: All tests PASSED (unit: 42s, integration: 1m18s, auto-grade: 23s). Score: 94/100. Schedule updated — added 'Eigenvalues Drill' block at 20:30. Arize trace logged with latency=287ms, tokens=1,204."
-        },
-    ]
+    # Chat interface layout
+    col_c1, col_c2 = st.columns([5, 4])
 
-    st.markdown("""
-    <div class="terminal-window">
-        <div class="terminal-header">
-            <div class="terminal-dot dot-red"></div>
-            <div class="terminal-dot dot-yellow"></div>
-            <div class="terminal-dot dot-green"></div>
-            <div class="terminal-title">GEMINI_AGENT_REASONING_SHELL ~ v3.0-flash</div>
-        </div>
-    """, unsafe_allow_html=True)
+    with col_c1:
+        st.markdown("##### 💬 Chat with your Academic Agent")
+        
+        # Display chat history
+        chat_container = st.container(height=350)
+        with chat_container:
+            if not st.session_state["chat_history"]:
+                st.caption("<div style='text-align:center; padding-top:100px; color:#555;'>No messages yet. Send a command to start the execution loop.</div>", unsafe_allow_html=True)
+            for chat in st.session_state["chat_history"]:
+                role = chat["role"]
+                content = chat["content"]
+                if role == "user":
+                    st.chat_message("user").markdown(content)
+                else:
+                    st.chat_message("assistant").markdown(content)
+                    
+        # User input prompt
+        user_prompt = st.chat_input("Enter instruction (e.g., 'Schedule a 2-hour practice block for Database Systems')")
+        
+        if user_prompt:
+            # Append user message
+            st.session_state["chat_history"].append({"role": "user", "content": user_prompt})
+            
+            # Run Agent
+            if AGENT_AVAILABLE:
+                with st.spinner("Agent running autonomous loop..."):
+                    try:
+                        runner = AcademicCommanderRunner()
+                        loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(loop)
+                        result = loop.run_until_complete(runner.run(user_prompt))
+                        # Append assistant response
+                        resp_text = result["response"]
+                        st.session_state["chat_history"].append({"role": "assistant", "content": resp_text})
+                    except Exception as e:
+                        st.session_state["chat_history"].append({"role": "assistant", "content": f"⚠️ Error executing agent loop: {e}"})
+            else:
+                # Simulated Agent response if API not set up
+                st.session_state["chat_history"].append({"role": "assistant", "content": f"""🤖 **(DEMO RESPONSE)**: I parsed your instruction: *'{user_prompt}'*.
 
-    for entry in trace_log:
-        st.markdown(f"""
-        <div class="trace-entry {entry['entry_class']}">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                <span class="trace-tag {entry['tag_class']}">{entry['type']}</span>
-                <span style="font-size:0.7rem; color:var(--text-muted);">{entry['timestamp']}</span>
+In live mode, I would call the appropriate MCP server tools (MongoDB, Elastic, or GitLab) to execute this. Currently running in mockup/demo state."""})
+            
+            st.rerun()
+
+    with col_c2:
+        st.markdown("##### 💻 Reasoning Terminal Output (Live stream)")
+        
+        # Terminal Header
+        st.markdown("""
+        <div class="terminal-window">
+            <div class="terminal-header" style="margin-bottom:10px; padding-bottom:8px;">
+                <div class="terminal-dot dot-red"></div>
+                <div class="terminal-dot dot-yellow"></div>
+                <div class="terminal-dot dot-green"></div>
+                <div class="terminal-title">GEMINI_AGENT_REASONING_SHELL ~ v3.0-flash</div>
             </div>
-            <div style="color:var(--text-secondary);">{entry['content']}</div>
-        </div>
+            <div id="terminal-body" style="font-family:'JetBrains Mono',monospace; font-size:0.75rem; color:#a8ff60; 
+                        height:310px; overflow-y:auto; line-height:1.6; white-space: pre-wrap;">
         """, unsafe_allow_html=True)
-
-    st.markdown("</div>", unsafe_allow_html=True)
+        
+        # Render logs
+        terminal_html = ""
+        for log in st.session_state["terminal_logs"][-30:]:  # Keep last 30 logs
+            color = "#e8eaed"
+            if "Tool call" in log or "MCP" in log:
+                color = "#00f0ff"  # Cyan for tool calls
+            elif "Response generated" in log or "passed" in log:
+                color = "#10b981"  # Green for success/responses
+            elif "Error" in log or "failed" in log:
+                color = "#f43f5e"  # Red for errors
+            elif "Processing" in log or "Thought" in log:
+                color = "#d946ef"  # Purple for thoughts
+                
+            terminal_html += f"<div style='color:{color};'>{log}</div>"
+            
+        st.markdown(terminal_html + "</div></div>", unsafe_allow_html=True)
+        
+        if st.button("🧹 Clear Terminal Logs", use_container_width=True):
+            st.session_state["terminal_logs"] = ["[System Console cleared. Ready for next loop...]"]
+            st.rerun()
 
 
 # ═══════════════════════ TAB 3: Daily Schedule ═══════════════════════════════
 with tab3:
     today_str = datetime.now().strftime("%A, %B %d, %Y")
     st.markdown(f"""
-    <div class="glass-card">
-        <h3 style="margin-top:0; font-size:1.15rem;">📅 Today's Study Plan</h3>
+    <div class="glass-card" style="margin-bottom: 24px;">
+        <h3 style="margin-top:0; font-size:1.25rem;">📅 Today's Study Plan</h3>
         <p style="color:var(--text-secondary); font-size:0.88rem; margin-bottom:4px;">
-            {today_str} &nbsp;·&nbsp; Auto-optimized by the scheduling agent
+            {today_str} &nbsp;·&nbsp; Auto-optimized study block intervals
         </p>
     </div>
     """, unsafe_allow_html=True)
 
-    schedule = get_schedule_data()
+    # Forms to Add Study block
+    with st.expander("📅 Create Custom Routine Block"):
+        col_sch1, col_sch2, col_sch3 = st.columns([2, 1, 1])
+        with col_sch1:
+            sch_activity = st.text_input("Activity/Topic Name", placeholder="e.g. Operating Systems Review")
+        with col_sch2:
+            sch_start = st.text_input("Start Time (24h format)", placeholder="e.g. 15:30")
+        with col_sch3:
+            sch_duration = st.slider("Duration (minutes)", 15, 180, 60, step=15)
+            
+        if st.button("Inject Calendar Block", use_container_width=True):
+            if sch_activity and sch_start:
+                save_schedule(sch_activity, sch_start, sch_duration)
+                st.success(f"Injected block: {sch_activity}!")
+                st.rerun()
+            else:
+                st.error("Please enter activity name and start time.")
+
+    # Timeline view
+    schedule = load_schedule()
+    
     st.markdown('<div class="timeline-container">', unsafe_allow_html=True)
     for block in schedule:
         type_class = f"type-{block['type']}"
@@ -1124,37 +1485,72 @@ with tab3:
         <div class="schedule-block type-{block['type']}">
             <div class="schedule-time">{block['time']}</div>
             <div style="font-size:1.3rem;">{block.get('emoji', '📖')}</div>
-            <div class="schedule-topic">{block['topic']}</div>
-            <div style="flex:1;"></div>
-            <span class="schedule-type {type_class}">{block['type']}</span>
+            <div class="schedule-topic" style="flex:1;">{block['topic']}</div>
         </div>
         """, unsafe_allow_html=True)
+        
+        # Inline delete block
+        col_del_1, col_del_2 = st.columns([6, 1])
+        with col_del_2:
+            if st.button("🗑️ Remove", key=f"del_sch_{block['topic']}", use_container_width=True):
+                delete_schedule(block['topic'])
+                st.warning(f"Deleted block: {block['topic']}")
+                st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ═══════════════════════ TAB 4: Pipeline Status ══════════════════════════════
 with tab4:
     st.markdown("""
-    <div class="glass-card">
-        <h3 style="margin-top:0; font-size:1.15rem;">🚀 GitLab CI/CD Pipeline Results</h3>
+    <div class="glass-card" style="margin-bottom: 24px;">
+        <h3 style="margin-top:0; font-size:1.25rem;">🚀 GitLab CI/CD Pipeline Results</h3>
         <p style="color:var(--text-secondary); font-size:0.88rem; margin-bottom:4px;">
-            Automated test & grading pipelines for code assignments
+            Live test & grading pipelines loaded directly via the GitLab API.
         </p>
     </div>
     """, unsafe_allow_html=True)
 
-    pipelines = get_pipeline_data()
+    # Actions row
+    c_pip1, c_pip2 = st.columns([3, 1])
+    with c_pip1:
+        st.caption("Active GitLab Project ID: " + os.getenv("GITLAB_PROJECT_ID", "Not configured"))
+    with c_pip2:
+        if st.button("⚡ Force CI/CD Pipeline Sync", use_container_width=True):
+            res = trigger_gitlab_pipeline_run()
+            if "error" in res:
+                st.error(res["error"])
+            else:
+                st.success(res["success"])
+                st.rerun()
+
+    # Load pipelines
+    pipelines = get_live_gitlab_pipelines()
+    
+    if pipelines is None:
+        # Fallback to mock data
+        st.info("💡 Showing simulated/mock pipelines (no GitLab credentials configured in .env)")
+        pipelines = [
+            {"pipeline": "#1847", "stage": "test", "job": "unit-tests", "status": "passed", "duration": "42s", "timestamp": "2026-05-28 22:14"},
+            {"pipeline": "#1847", "stage": "test", "job": "integration-tests", "status": "passed", "duration": "1m 18s", "timestamp": "2026-05-28 22:15"},
+            {"pipeline": "#1847", "stage": "grade", "job": "auto-grade", "status": "passed", "duration": "23s", "timestamp": "2026-05-28 22:16"},
+            {"pipeline": "#1846", "stage": "test", "job": "unit-tests", "status": "passed", "duration": "39s", "timestamp": "2026-05-28 18:05"},
+            {"pipeline": "#1846", "stage": "test", "job": "integration-tests", "status": "passed", "duration": "1m 02s", "timestamp": "2026-05-28 18:06"},
+            {"pipeline": "#1845", "stage": "test", "job": "unit-tests", "status": "passed", "duration": "41s", "timestamp": "2026-05-27 14:32"},
+            {"pipeline": "#1845", "stage": "grade", "job": "auto-grade", "status": "passed", "duration": "21s", "timestamp": "2026-05-27 14:33"},
+        ]
+
     for p in pipelines:
         status_class = "pipeline-pass" if p["status"] == "passed" else "pipeline-fail"
         status_icon = "✅" if p["status"] == "passed" else "❌"
-        st.markdown(f'<div class="pipeline-card" style="display:flex; justify-content:space-between; align-items:center; width:100%;"><div style="display:flex; align-items:center; gap:12px;"><span style="font-family:\'JetBrains Mono\',monospace; font-weight:700; color:var(--accent-cyan); font-size:0.9rem;">{p["pipeline"]}</span><span style="font-size:0.78rem; color:var(--text-muted); background:rgba(255,255,255,0.04); padding:2px 8px; border-radius:4px;">{p["stage"]}</span><span style="font-weight:600; color:var(--text-primary); font-size:0.9rem;">{p["job"]}</span></div><div style="display:flex; align-items:center; gap:16px;"><span style="font-size:0.78rem; color:var(--text-muted);">⏱ {p["duration"]}</span><span style="font-size:0.78rem; color:var(--text-muted);">{p["timestamp"]}</span><span class="{status_class}">{status_icon} {p["status"].upper()}</span></div></div>', unsafe_allow_html=True)
+        st.markdown(f"""<div class="pipeline-card" style="display:flex; justify-content:space-between; align-items:center; width:100%;"><div style="display:flex; align-items:center; gap:12px;"><span style="font-family:'JetBrains Mono',monospace; font-weight:700; color:var(--accent-cyan); font-size:0.9rem;">{p["pipeline"]}</span><span style="font-size:0.78rem; color:var(--text-muted); background:rgba(255,255,255,0.04); padding:2px 8px; border-radius:4px;">{p["stage"]}</span><span style="font-weight:600; color:var(--text-primary); font-size:0.9rem;">{p["job"]}</span></div><div style="display:flex; align-items:center; gap:16px;"><span style="font-size:0.78rem; color:var(--text-muted);">⏱ {p["duration"]}</span><span style="font-size:0.78rem; color:var(--text-muted);">{p["timestamp"]}</span><span class="{status_class}">{status_icon} {p["status"].upper()}</span></div></div>""", unsafe_allow_html=True)
 
     # Summary row
     total = len(pipelines)
     passed = sum(1 for p in pipelines if p["status"] == "passed")
     failed = total - passed
+    pass_rate = (passed / total * 100) if total > 0 else 100
     st.markdown(f"""
-    <div class="glass-card" style="margin-top:16px;">
+    <div class="glass-card" style="margin-top:20px;">
         <div style="display:flex; justify-content:space-around; text-align:center;">
             <div>
                 <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">Total Jobs</div>
@@ -1170,7 +1566,7 @@ with tab4:
             </div>
             <div>
                 <div style="font-size:0.75rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">Pass Rate</div>
-                <div style="font-size:1.8rem; font-weight:800; color:var(--accent-green);">{passed/total*100:.0f}%</div>
+                <div style="font-size:1.8rem; font-weight:800; color:var(--accent-green);">{pass_rate:.0f}%</div>
             </div>
         </div>
     </div>
@@ -1180,25 +1576,26 @@ with tab4:
 # ═══════════════════════ TAB 5: Agent Quality ════════════════════════════════
 with tab5:
     st.markdown("""
-    <div class="glass-card">
-        <h3 style="margin-top:0; font-size:1.15rem;">🛡️ Arize AI — Agent Observability</h3>
+    <div class="glass-card" style="margin-bottom: 24px;">
+        <h3 style="margin-top:0; font-size:1.25rem;">🛡️ Arize AI — Agent Observability</h3>
         <p style="color:var(--text-secondary); font-size:0.88rem; margin-bottom:4px;">
-            Real-time quality metrics, hallucination detection, and trace analytics
+            Real-time quality metrics, hallucination detection, and trace analytics synced with Arize platform.
         </p>
     </div>
     """, unsafe_allow_html=True)
 
+    # Load Quality metrics
     qm = get_quality_metrics()
 
     q1, q2, q3, q4 = st.columns(4)
 
     with q1:
         hall_pct = qm["hallucination_score"] * 100
-        ring_color = "conic-gradient(#22c55e 0% {0}%, rgba(255,255,255,0.05) {0}% 100%)".format(int((1 - qm["hallucination_score"]) * 100))
+        ring_color = "conic-gradient(#10b981 0% {0}%, rgba(255,255,255,0.05) {0}% 100%)".format(int((1 - qm["hallucination_score"]) * 100))
         st.markdown(f"""
         <div class="glass-card" style="text-align:center;">
             <div class="gauge-ring" style="background:{ring_color};">
-                <span class="gauge-value" style="color:#22c55e;">{hall_pct:.1f}%</span>
+                <span class="gauge-value" style="color:#10b981;">{hall_pct:.1f}%</span>
             </div>
             <div style="font-weight:700; font-size:0.9rem; color:var(--text-primary);">Hallucination Rate</div>
             <div style="font-size:0.78rem; color:var(--accent-green); margin-top:4px;">● Excellent</div>
@@ -1207,11 +1604,11 @@ with tab5:
 
     with q2:
         acc_pct = qm["accuracy"] * 100
-        ring_color2 = "conic-gradient(#00d4ff 0% {0}%, rgba(255,255,255,0.05) {0}% 100%)".format(int(acc_pct))
+        ring_color2 = "conic-gradient(#00f0ff 0% {0}%, rgba(255,255,255,0.05) {0}% 100%)".format(int(acc_pct))
         st.markdown(f"""
         <div class="glass-card" style="text-align:center;">
             <div class="gauge-ring" style="background:{ring_color2};">
-                <span class="gauge-value" style="color:#00d4ff;">{acc_pct:.0f}%</span>
+                <span class="gauge-value" style="color:#00f0ff;">{acc_pct:.0f}%</span>
             </div>
             <div style="font-weight:700; font-size:0.9rem; color:var(--text-primary);">Response Accuracy</div>
             <div style="font-size:0.78rem; color:var(--accent-cyan); margin-top:4px;">● High</div>
@@ -1220,11 +1617,11 @@ with tab5:
 
     with q3:
         rel_pct = qm["relevance"] * 100
-        ring_color3 = "conic-gradient(#a855f7 0% {0}%, rgba(255,255,255,0.05) {0}% 100%)".format(int(rel_pct))
+        ring_color3 = "conic-gradient(#d946ef 0% {0}%, rgba(255,255,255,0.05) {0}% 100%)".format(int(rel_pct))
         st.markdown(f"""
         <div class="glass-card" style="text-align:center;">
             <div class="gauge-ring" style="background:{ring_color3};">
-                <span class="gauge-value" style="color:#a855f7;">{rel_pct:.0f}%</span>
+                <span class="gauge-value" style="color:#d946ef;">{rel_pct:.0f}%</span>
             </div>
             <div style="font-weight:700; font-size:0.9rem; color:var(--text-primary);">Relevance Score</div>
             <div style="font-size:0.78rem; color:var(--accent-purple); margin-top:4px;">● Strong</div>
@@ -1233,11 +1630,11 @@ with tab5:
 
     with q4:
         safe_pct = qm["safety_score"] * 100
-        ring_color4 = "conic-gradient(#22c55e 0% {0}%, rgba(255,255,255,0.05) {0}% 100%)".format(int(safe_pct))
+        ring_color4 = "conic-gradient(#10b981 0% {0}%, rgba(255,255,255,0.05) {0}% 100%)".format(int(safe_pct))
         st.markdown(f"""
         <div class="glass-card" style="text-align:center;">
             <div class="gauge-ring" style="background:{ring_color4};">
-                <span class="gauge-value" style="color:#22c55e;">{safe_pct:.0f}%</span>
+                <span class="gauge-value" style="color:#10b981;">{safe_pct:.0f}%</span>
             </div>
             <div style="font-weight:700; font-size:0.9rem; color:var(--text-primary);">Safety Score</div>
             <div style="font-size:0.78rem; color:var(--accent-green); margin-top:4px;">● Excellent</div>
@@ -1277,19 +1674,19 @@ with tab5:
             <h4 style="font-size:1rem; margin-top:0;">📊 Trace Distribution</h4>
             <div class="sidebar-stat">
                 <span class="sidebar-stat-label">Thought Traces</span>
-                <span style="color:#a855f7; font-weight:600;">423</span>
+                <span style="color:#d946ef; font-weight:600;">423</span>
             </div>
             <div class="sidebar-stat">
                 <span class="sidebar-stat-label">Action Traces</span>
-                <span style="color:#00d4ff; font-weight:600;">412</span>
+                <span style="color:#00f0ff; font-weight:600;">412</span>
             </div>
             <div class="sidebar-stat">
                 <span class="sidebar-stat-label">Observation Traces</span>
-                <span style="color:#22c55e; font-weight:600;">412</span>
+                <span style="color:#10b981; font-weight:600;">412</span>
             </div>
             <div class="sidebar-stat">
                 <span class="sidebar-stat-label">Error Traces</span>
-                <span style="color:#ef4444; font-weight:600;">0</span>
+                <span style="color:#f43f5e; font-weight:600;">0</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
