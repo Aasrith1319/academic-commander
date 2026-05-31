@@ -321,6 +321,16 @@ async def get_metrics():
             {"time": "Startup", "event": "[SYSTEM] Connected to MongoDB Atlas"},
         ]
 
+    student_profile = db["student_profile"].find_one({}, {"_id": 0})
+    if not student_profile:
+        student_profile = {
+            "name": "Alex",
+            "major": "Computer Science",
+            "year": "Junior",
+            "gpa": "3.8",
+            "university": "Tech University"
+        }
+
     return {
         "mastery_avg": f"{avg_mastery:.0f}%",
         "topics_tracked": len(topics),
@@ -328,15 +338,14 @@ async def get_metrics():
         "study_streak": 14,
         "topics": topics,
         "feed": feed,
-        "student": {
-            "name": "Alex",
-            "major": "Computer Science",
-            "year": "Junior",
-            "gpa": "3.8",
-            "university": "Tech University"
-        }
+        "student": student_profile
     }
 
+@app.post("/api/student")
+async def update_student(req: Request):
+    data = await req.json()
+    db["student_profile"].update_one({}, {"$set": data}, upsert=True)
+    return {"status": "success"}
 
 @app.get("/api/schedule")
 async def get_schedule():

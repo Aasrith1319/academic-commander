@@ -18,6 +18,8 @@ export default function App() {
   const [status, setStatus] = useState({ status: 'connecting', agent_available: false });
   const [showTopicModal, setShowTopicModal] = useState(false);
   const [theme, setTheme] = useState('dark');
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileData, setProfileData] = useState({ name: '', major: '', year: '', gpa: '', university: '' });
 
   useEffect(() => {
     fetchData();
@@ -33,7 +35,7 @@ export default function App() {
 
     fetch('/api/metrics')
       .then(res => res.json())
-      .then(data => setMetrics(data))
+      .then(data => setMetrics(data); if(data.student) setProfileData(data.student); })
       .catch(err => console.error("Metrics error:", err));
   };
 
@@ -147,8 +149,22 @@ export default function App() {
               exit={{ opacity: 0, y: -20 }}
               transition={{ duration: 0.3 }}
             >
-              <h1 className="glow-text" style={{ fontSize: '2.5rem', marginBottom: '8px' }}>Command Center</h1>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>Real-time overview of your academic operations.</p>
+              <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px' }}>
+                <div>
+                  <h1 className="glow-text" style={{ fontSize: '2.5rem', marginBottom: '8px' }}>
+                    Welcome back, {metrics.student ? metrics.student.name : 'Commander'}
+                  </h1>
+                  <p style={{ color: 'var(--text-secondary)' }}>
+                    {metrics.student ? `${metrics.student.major} • ${metrics.student.year} • GPA: ${metrics.student.gpa} • ${metrics.student.university}` : 'Real-time overview of your academic operations.'}
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setShowProfileModal(true)}
+                  style={{ padding: '10px 20px', background: 'var(--glass-bg)', color: 'var(--text-primary)', border: '1px solid var(--glass-border)', borderRadius: '8px', cursor: 'pointer', display: 'flex', gap: '8px', alignItems: 'center' }}
+                >
+                   Edit Profile
+                </button>
+              </header>
               
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '40px' }}>
                 <MetricCard title="Topics Tracked" value={metrics.topics_tracked} color="var(--accent-cyan)" onClick={() => setActiveTab('knowledge')} />
