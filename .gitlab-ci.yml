@@ -1,0 +1,128 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# ⚡ Academic Commander — GitLab CI/CD Pipeline
+# ═══════════════════════════════════════════════════════════════════════════════
+# Automated testing and grading pipeline for student code assignments.
+# Integrates with the GitLab MCP server for real-time status updates.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+image: python:3.11
+
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  PYTHONDONTWRITEBYTECODE: "1"
+
+cache:
+  paths:
+    - .cache/pip
+    - venv/
+
+stages:
+  - test
+  - grade
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STAGE: test
+# ─────────────────────────────────────────────────────────────────────────────
+
+unit-tests:
+  stage: test
+  before_script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install --upgrade pip
+    - pip install -r requirements.txt
+  script:
+    - echo "🧪 Running unit tests..."
+    - python -m pytest tests/ -v --tb=short --junitxml=reports/unit-tests.xml
+  artifacts:
+    when: always
+    reports:
+      junit: reports/unit-tests.xml
+    paths:
+      - reports/
+    expire_in: 30 days
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+integration-tests:
+  stage: test
+  before_script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install --upgrade pip
+    - pip install -r requirements.txt
+  script:
+    - echo "🔗 Running integration tests..."
+    - python -m pytest tests/integration/ -v --tb=short --junitxml=reports/integration-tests.xml
+  artifacts:
+    when: always
+    reports:
+      junit: reports/integration-tests.xml
+    paths:
+      - reports/
+    expire_in: 30 days
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# STAGE: grade
+# ─────────────────────────────────────────────────────────────────────────────
+
+auto-grade:
+  stage: grade
+  needs:
+    - unit-tests
+  before_script:
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install --upgrade pip
+    - pip install -r requirements.txt
+  script:
+    - echo "📝 Parsing test results and computing grade..."
+    - |
+      python -c "
+      import xml.etree.ElementTree as ET
+      import json, sys
+
+      tree = ET.parse('reports/unit-tests.xml')
+      root = tree.getroot()
+
+      total = int(root.attrib.get('tests', 0))
+      failures = int(root.attrib.get('failures', 0))
+      errors = int(root.attrib.get('errors', 0))
+      passed = total - failures - errors
+      score = (passed / total * 100) if total > 0 else 0
+
+      report = {
+          'total_tests': total,
+          'passed': passed,
+          'failures': failures,
+          'errors': errors,
+          'score': round(score, 2),
+          'grade': 'A' if score >= 90 else 'B' if score >= 80 else 'C' if score >= 70 else 'D' if score >= 60 else 'F'
+      }
+
+      print('═' * 50)
+      print('⚡ ACADEMIC COMMANDER — AUTO-GRADE REPORT')
+      print('═' * 50)
+      for k, v in report.items():
+          print(f'  {k:>15}: {v}')
+      print('═' * 50)
+
+      with open('reports/grade-report.json', 'w') as f:
+          json.dump(report, f, indent=2)
+
+      if score < 60:
+          print('⚠️  Score below passing threshold (60%)')
+          sys.exit(1)
+      "
+  artifacts:
+    when: always
+    paths:
+      - reports/grade-report.json
+    expire_in: 90 days
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push"
