@@ -588,9 +588,30 @@ function KnowledgeBaseView({ topics }) {
               {files.length > 0 ? (
                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {files.map((f, i) => (
-                       <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '12px', background: 'var(--glass-bg)', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
-                          <span style={{ color: 'var(--accent-cyan)' }}>{f.name}</span>
-                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{(f.size / 1024).toFixed(1)} KB</span>
+                       <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px', background: 'var(--glass-bg)', borderRadius: '8px', border: '1px solid var(--glass-border)' }}>
+                          <div>
+                            <span style={{ color: 'var(--accent-cyan)', display: 'block' }}>{f.name}</span>
+                            <span style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>{(f.size / 1024).toFixed(1)} KB</span>
+                          </div>
+                          <button 
+                            onClick={async () => {
+                               if(window.confirm(`Delete ${f.name}?`)) {
+                                  try {
+                                     const res = await fetch(`/api/files/${f.name}`, { method: 'DELETE' });
+                                     if(res.ok) {
+                                        setFiles(files.filter(file => file.name !== f.name));
+                                     } else {
+                                        alert('Failed to delete file.');
+                                     }
+                                  } catch (e) {
+                                     console.error(e);
+                                  }
+                               }
+                            }}
+                            title="Delete File"
+                            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--accent-red)' }}>
+                            <Trash2 size={18} />
+                          </button>
                        </div>
                     ))}
                  </div>

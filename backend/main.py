@@ -230,6 +230,18 @@ async def get_files():
             })
     return files
 
+@app.delete("/api/files/{filename}")
+async def delete_file(filename: str):
+    ingestion_dir = os.path.join(root_dir, "ingestion")
+    filepath = os.path.join(ingestion_dir, filename)
+    if os.path.exists(filepath) and os.path.isfile(filepath):
+        try:
+            os.remove(filepath)
+            return {"status": "success", "message": f"Deleted {filename}"}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
+    raise HTTPException(status_code=404, detail="File not found")
+
 @app.get("/api/analytics")
 async def get_analytics():
     # Fetch real topics
@@ -316,6 +328,13 @@ async def get_metrics():
         "study_streak": 14,
         "topics": topics,
         "feed": feed,
+        "student": {
+            "name": "Alex",
+            "major": "Computer Science",
+            "year": "Junior",
+            "gpa": "3.8",
+            "university": "Tech University"
+        }
     }
 
 
