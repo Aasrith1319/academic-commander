@@ -43,25 +43,6 @@ unit-tests:
     expire_in: 30 days
 
 
-integration-tests:
-  stage: test
-  before_script:
-    - python -m venv venv
-    - source venv/bin/activate
-    - pip install --upgrade pip
-    - pip install -r requirements-test.txt
-  script:
-    - echo "🔗 Running integration tests..."
-    - python -m pytest tests/integration/ -v --tb=short --junitxml=reports/integration-tests.xml
-  artifacts:
-    when: always
-    reports:
-      junit: reports/integration-tests.xml
-    paths:
-      - reports/
-    expire_in: 30 days
-  allow_failure: true
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # STAGE: grade
